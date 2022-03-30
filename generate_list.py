@@ -13,7 +13,19 @@ json_data = json.loads(content)
 # doc for the json is here:
 # https://doc.rust-lang.org/stable/nightly-rustc/rustdoc_json_types/index.html
 outputs = {}
-ARCHS = ["x86"]
+ARCHS = [
+    "AMDGPU",
+    "aarch64",
+    "arm",
+    "cuda",
+    "hexagon",
+    "mips",
+    "nvvm",
+    "ppc",
+    "ptx",
+    "x86",
+    "xcore",
+]
 for p in json_data["paths"]:
   it = json_data["paths"][p]
   # If we want, we can switch "x86" with another arch without problem.
