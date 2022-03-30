@@ -12,16 +12,26 @@ with open('target/doc/llvmint.json', 'r', encoding='utf8') as f:
 json_data = json.loads(content)
 # doc for the json is here:
 # https://doc.rust-lang.org/stable/nightly-rustc/rustdoc_json_types/index.html
-output = []
+outputs = {}
+ARCHS = ["x86"]
 for p in json_data["paths"]:
   it = json_data["paths"][p]
   # If we want, we can switch "x86" with another arch without problem.
-  if len(it["path"]) != 3 or it["path"][1] != "x86":
+  if len(it["path"]) != 3 or it["path"][1] not in ARCHS:
     continue
+  arch = it["path"][1]
+  if arch not in outputs:
+    outputs[arch] = []
   it = json_data["index"][p]
   content = it["docs"].split('`')
   if len(content) != 5:
     continue
-  output.append('"{}" => "{}",'.format(content[1], content[3]))
-output.sort()
-print('\n'.join(output))
+  outputs[arch].append('"{}" => "{}",'.format(content[1], content[3]))
+
+print('match name {')
+for arch in outputs:
+   outputs[arch].sort()
+   print('// {}'.format(arch))
+   print('\n'.join(outputs[arch]))
+print('_ => "",')
+print('}')
