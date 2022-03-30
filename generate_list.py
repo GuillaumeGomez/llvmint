@@ -12,6 +12,7 @@ with open('target/doc/llvmint.json', 'r', encoding='utf8') as f:
 json_data = json.loads(content)
 # doc for the json is here:
 # https://doc.rust-lang.org/stable/nightly-rustc/rustdoc_json_types/index.html
+output = []
 for p in json_data["paths"]:
   it = json_data["paths"][p]
   # If we want, we can switch "x86" with another arch without problem.
@@ -21,4 +22,6 @@ for p in json_data["paths"]:
   content = it["docs"].split('`')
   if len(content) != 5:
     continue
-  print('"{}" => "{}"'.format(content[1], content[3]))
+  output.append('"{}" => "{}",'.format(content[1], content[3]))
+output.sort()
+print('\n'.join(output))
