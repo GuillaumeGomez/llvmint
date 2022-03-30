@@ -1,6 +1,7 @@
 # Once done, the code to update can be seen there:
 # https://github.com/rust-lang/rustc_codegen_gcc/pull/129/files#diff-4fb378dd283a8400f8f8defde08413dc31a55b1a776c3fa2473e3f059061740cR10-R114
 import os
+import json
 
 # First we generate the JSON version of the docs.
 os.system("cargo rustdoc -- -Zunstable-options --output-format json")
