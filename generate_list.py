@@ -43,7 +43,7 @@ for p in json_data["paths"]:
 print('match name {')
 for arch in outputs:
    outputs[arch].sort()
-   print('// {}'.format(arch))
-   print('\n'.join(outputs[arch]))
+   print('    // {}'.format(arch))
+   print('\n'.join(['    {}'.format(x) for x in outputs[arch]]))
 print('_ => unimplemented!("***** unsupported LLVM intrinsic {}", name),')
 print('}')
