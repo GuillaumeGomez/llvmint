@@ -33,5 +33,5 @@ for arch in outputs:
    outputs[arch].sort()
    print('// {}'.format(arch))
    print('\n'.join(outputs[arch]))
-print('_ => "",')
+print('_ => unimplemented!("***** unsupported LLVM intrinsic {}", name),')
 print('}')
