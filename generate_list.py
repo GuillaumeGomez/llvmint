@@ -21,4 +21,4 @@ for p in json_data["paths"]:
   content = it["docs"].split('`')
   if len(content) != 5:
     continue
-  print('"{}" => "{}"'.format(it["name"], content[1], content[3]))
+  print('"{}" => "{}"'.format(content[1], content[3]))
