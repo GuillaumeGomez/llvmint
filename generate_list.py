@@ -44,11 +44,11 @@ for p in json_data["paths"]:
   if it["kind"] != "function":
     # We're only looking for functions.
     continue
-  if len(it["path"]) == 2:
-    # This is a "general" intrinsic, not bound to a specific arch.
-    append_translation(json_data, p, general)
-    continue
-  elif len(it["path"]) != 3 or it["path"][1] not in ARCHS:
+  # if len(it["path"]) == 2:
+  #   # This is a "general" intrinsic, not bound to a specific arch.
+  #   append_translation(json_data, p, general)
+  #   continue
+  if len(it["path"]) != 3 or it["path"][1] not in ARCHS:
     continue
   arch = it["path"][1]
   if arch not in outputs:
