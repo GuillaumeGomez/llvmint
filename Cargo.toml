@@ -1,12 +1,12 @@
 [package]
 
 name = "llvmint"
-version = "0.0.2"
-authors = ["Huon Wilson <dbau.pp@gmail.com>"]
+version = "0.0.3"
+authors = ["Huon Wilson <dbau.pp@gmail.com>", "Avi Weinstock <aweinstock314@gmail.com>"]
 
-homepage = "https://github.com/huonw/llvmint"
-repository = "https://github.com/huonw/llvmint"
-documentation = "http://huonw.github.io/llvmint/llvmint/"
+homepage = "https://github.com/aweinstock314/llvmint"
+repository = "https://github.com/aweinstock314/llvmint"
+documentation = "https://docs.rs/llvmint"
 license = "MIT/Apache-2.0"
 keywords = ["numerics", "simd", "llvm", "intrinsics"]
 readme = "README.md"

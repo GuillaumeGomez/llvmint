@@ -4,6 +4,10 @@ use std::collections::HashMap;
 use std::{cmp, mem};
 use std::path::Path;
 
+/// This module consists of a lexer/parser for LLVM's TableGen format
+/// http://llvm.org/docs/TableGen/LangRef.html
+// TODO: figure out if this is independently useful, and put it in a seperate crate
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     Ident(String),
@@ -18,31 +22,34 @@ enum Token {
     Semicolon,
     Equals,
     Bang,
+    Sharp,
 }
 
 fn tokenize(mut s: &str) -> Vec<Token> {
     let mut stack = vec![];
     let mut current = vec![];
-    while !s.is_empty() && s.char_at(0).is_whitespace() {
+    while !s.is_empty() && s.chars().next().unwrap().is_whitespace() {
         // will fail with non-ascii whitespace
         s = &s[1..]
     }
 
     while !s.is_empty() {
-        let length = match s.char_at(0) {
+        let length = match s.chars().next().unwrap() {
             ':' => { current.push(Token::Colon); 1 },
             ',' => { current.push(Token::Comma); 1 },
             ';' => { current.push(Token::Semicolon); 1 },
             '=' => { current.push(Token::Equals); 1 },
-            '!' => { current.push(Token::Bang); 1 }
+            '!' => { current.push(Token::Bang); 1 },
+            '#' => { current.push(Token::Sharp); 1 },
             '"' /*"*/=> {
-                let string = regex!("^\"(.*?)\"").captures(s).expect("bad string").at(1)
-                    .unwrap();
+                let string = regex!("^\"(.*?)\"").captures(s).expect("bad string").get(1)
+                    .unwrap().as_str();
                 current.push(Token::String(string.to_string()));
                 string.len() + 2
             }
             '0'...'9' => {
-                let num = regex!("^[0-9]+").captures(s).expect("bad num").at(0).unwrap();
+                let num = regex!("^[0-9]+").captures(s).expect("bad num").get(0).unwrap()
+                    .as_str();
                 current.push(Token::Int(num.parse().unwrap()));
                 num.len()
             }
@@ -78,7 +85,7 @@ fn tokenize(mut s: &str) -> Vec<Token> {
             c if c.is_whitespace() => 0,
             _ => {
                 let ident = match regex!("[A-Za-z0-9_]+").captures(s) {
-                    Some(i) => i.at(0).unwrap(),
+                    Some(i) => i.get(0).unwrap().as_str(),
                     None => panic!("invalid token stream, {}...", &s[..cmp::max(10, s.len())])
                 };
                 current.push(Token::Ident(ident.to_string()));
@@ -86,7 +93,7 @@ fn tokenize(mut s: &str) -> Vec<Token> {
             }
         };
         s = &s[length..];
-        while !s.is_empty() && s.char_at(0).is_whitespace() {
+        while !s.is_empty() && s.chars().next().unwrap().is_whitespace() {
             // will fail with non-ascii whitespace
             s = &s[1..]
         }
@@ -124,16 +131,22 @@ pub struct Def {
 }
 #[derive(Clone, Debug)]
 pub struct Let {
-    pub items: Vec<Item>,
+    pub letlist: Vec<LetItem>,
+    pub objects: Vec<Object>,
+}
+#[derive(Clone, Debug)]
+pub struct LetItem {
+    pub name: String,
+    // other fields aren't relevant to intrinsics
 }
 
 #[derive(Clone, Debug)]
 pub struct Include {
-    items: Vec<Item>,
+    objects: Vec<Object>,
 }
 
 #[derive(Clone, Debug)]
-pub enum Item {
+pub enum Object {
     Class(Class),
     Multiclass(Class),
     Def(Def),
@@ -142,19 +155,19 @@ pub enum Item {
     Include(Include),
 }
 
-pub fn flatten_separate(items: Vec<Item>) -> (Vec<Class>, Vec<Def>) {
+pub fn flatten_separate(objects: Vec<Object>) -> (Vec<Class>, Vec<Def>) {
     let mut classes = vec![];
     let mut defs = vec![];
-    for it in items.into_iter() {
+    for it in objects.into_iter() {
         match it {
-            Item::Let(Let { items }) | Item::Include(Include { items }) => {
-                let (c, d) = flatten_separate(items);
+            Object::Let(Let { letlist: _, objects }) | Object::Include(Include { objects }) => {
+                let (c, d) = flatten_separate(objects);
                 classes.extend(c.into_iter());
                 defs.extend(d.into_iter());
             }
-            Item::Defm(_) | Item::Multiclass(_) => {}
-            Item::Class(c) => classes.push(c),
-            Item::Def(d) => defs.push(d),
+            Object::Defm(_) | Object::Multiclass(_) => {}
+            Object::Class(c) => classes.push(c),
+            Object::Def(d) => defs.push(d),
         }
     }
     (classes, defs)
@@ -268,23 +281,24 @@ impl<'a, I: Iterator<Item = Token>> Parser<'a, I> {
         self.expect_ident_or_eof().expect("expected ident, found EOF")
     }
 
-    fn parse_items_to_eof(&mut self) -> Vec<Item> {
+    fn parse_objects_to_eof(&mut self) -> Vec<Object> {
         let mut ret = vec![];
-        while let Some(item) = self.parse_item_or_eof() {
+        while let Some(item) = self.parse_object_or_eof() {
+            debug!("parsed a {:?}", item);
             ret.push(item);
         }
         ret
     }
 
-    fn parse_item_or_eof(&mut self) -> Option<Item> {
+    fn parse_object_or_eof(&mut self) -> Option<Object> {
         self.expect_ident_or_eof().map(|s| {
             match &*s {
-                "def" => Item::Def(self.parse_def()),
-                "defm" => Item::Defm(self.parse_def()),
-                "let" => Item::Let(self.parse_let()),
-                "class" => Item::Class(self.parse_class()),
-                "multiclass" => Item::Multiclass(self.parse_class()),
-                "include" => Item::Include(self.parse_include()),
+                "def" => Object::Def(self.parse_def()),
+                "defm" => Object::Defm(self.parse_def()),
+                "let" => Object::Let(self.parse_let()),
+                "class" => Object::Class(self.parse_class()),
+                "multiclass" => Object::Multiclass(self.parse_class()),
+                "include" => Object::Include(self.parse_include()),
                 _ => panic!("unexpected keyword {}", s)
             }
         })
@@ -297,21 +311,43 @@ impl<'a, I: Iterator<Item = Token>> Parser<'a, I> {
         Def { name: name, inherits: inherits }
     }
 
+    // Let     ::=   "let" LetList "in" "{" Object* "}"
+    //             | "let" LetList "in" Object
     fn parse_let(&mut self) -> Let {
-        let _name = self.expect_ident();
-        self.expect_token(Token::Equals);
-        match self.token() {
-            Token::Square(_) | Token::String(_) | Token::Int(_) => {}
-            tok => panic!("expected [...], string or int, found {:?}", tok)
-        }
-        self.expect_token(Token::Ident("in".to_string()));
+        let letlist = self.parse_letlist();
         match self.token() {
             Token::Braces(contents) => {
                 let mut subparser = self.subparser(contents.into_iter());
-                let items = subparser.parse_items_to_eof();
-                Let { items: items }
+                let objects = subparser.parse_objects_to_eof();
+                Let { letlist: letlist, objects: objects }
             }
             tok => panic!("expected {{...}}, found {:?}", tok)
+        }
+    }
+
+    // LetList ::=  LetItem ("," LetItem)*
+    fn parse_letlist(&mut self) -> Vec<LetItem> {
+        let mut res = vec![self.parse_letitem()];
+        loop {
+            match self.token() {
+                Token::Comma => res.push(self.parse_letitem()),
+                Token::Ident(ref x) if &*x == "in" => return res,
+                tok => panic!("expected Comma or \"in\" at end of LetList, found {:?}", tok),
+            }
+        }
+    }
+
+    // LetItem ::=  TokIdentifier [RangeList] "=" Value
+    fn parse_letitem(&mut self) -> LetItem {
+        let name = self.expect_ident();
+        // RangeList doesn't seem to be used in allintrinsics.td yet, so just assume '=' is next
+        self.expect_token(Token::Equals);
+        let _value = match self.token() {
+            Token::Square(_) | Token::String(_) | Token::Int(_) => {}
+            tok => panic!("expected [...], string or int, found {:?}", tok)
+        };
+        LetItem {
+            name: name
         }
     }
 
@@ -365,12 +401,12 @@ impl<'a, I: Iterator<Item = Token>> Parser<'a, I> {
 
         if true {
             // ignore includes for now
-            return Include { items: vec![] }
+            return Include { objects: vec![] }
         }
         let file = self.root.join(path);
         let mut s = String::new();
         File::open(&file).unwrap().read_to_string(&mut s).unwrap();
-        Include { items: parse(&s, self.root) }
+        Include { objects: parse(&s, self.root) }
     }
 
     fn parse_inherits(&mut self) -> Vec<Type> {
@@ -409,6 +445,12 @@ impl<'a, I: Iterator<Item = Token>> Parser<'a, I> {
         while let Some((val, tok)) = self.try_parse_val_or_eof() {
             ret.push(val);
             match tok.or_else(|| self.tokens.next()) {
+                Some(Token::Sharp) => break,
+                // ignoring Sharp is is probably wrong: # seems to be being 
+                //  used as an infix binop in the tablegen files, but the EBNF 
+                //  spec doesn't have a case for it; this treats it as a 
+                //  sub-EOF in order to get to the parts of the file that we 
+                //  need for emitting intrinsics
                 Some(tok) => expect(tok, Token::Comma),
                 None => break
             }
@@ -450,10 +492,10 @@ impl<'a, I: Iterator<Item = Token>> Parser<'a, I> {
     }
 }
 
-pub fn parse(s: &str, root: &Path) -> Vec<Item> {
+pub fn parse(s: &str, root: &Path) -> Vec<Object> {
     let mut p = Parser {
-        tokens: tokenize(s).into_iter(),
+        tokens: tokenize(s).into_iter().map(|x| { trace!("tokenizer: popping {:?}", x); x }),
         root: root
     };
-    p.parse_items_to_eof()
+    p.parse_objects_to_eof()
 }

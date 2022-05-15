@@ -64,7 +64,7 @@ fn parse_internals(s: &str) -> Result<LLVMType, ()> {
             parse_internals(&s[v_len_idx..]).map(|t| LLVMType::Vector(Some((n, Box::new(t)))))
         })
     } else {
-        println!("unrecognised {}", s);
+        warn!("unrecognised {}", s);
         Err(())
     }
 }
@@ -289,16 +289,17 @@ pub struct Intrinsic {
 }
 
 impl Intrinsic {
-    pub fn from_ast(d: &ast::Def) -> Option<Intrinsic> {
-        if !d.name.starts_with("int_") { return None }
+    pub fn from_ast(d: &ast::Def) -> Result<Intrinsic, &'static str> {
+        if !d.name.starts_with("int_") { return Err("name doesn't start with 'int_'") }
         let arch = regex!(r"^int_([^_]*)");
-        let arch = arch.captures(&d.name).unwrap().at(1).unwrap().parse();
+        let arch = arch.captures(&d.name).unwrap().get(1).unwrap().as_str().parse();
 
         let mut gcc_name = None;
         let mut llvm_name = None;
         let mut ret = vec![];
         let mut params = vec![];
         for sup in d.inherits.iter() {
+            trace!("codegen: {:?} :: {:?}", d.name, sup.name);
             match &*sup.name {
                 "GCCBuiltin" => {
                     match sup.args[0] {
@@ -307,44 +308,44 @@ impl Intrinsic {
                                 gcc_name = Some(s.clone())
                             }
                         }
-                        _ => return None
+                        _ => return Err("missing GCCBuiltin[0]")
                     }
                 }
                 "Intrinsic" => {
                     match sup.args[0] {
                         ast::Val::List(ref ret_) => {
-                            ret = try_opt!(ret_.iter()
+                            ret = try!(ret_.iter()
                                 .map(|v| match *v {
                                     ast::Val::Type(ref t) => LLVMType::from_ast(t),
                                     _ => None
                                 })
-                                .collect::<Option<_>>())
+                                .collect::<Option<_>>().ok_or("missing ret"))
                         }
-                        _ => return None
+                        _ => return Err("missing Intrinsic[0]")
                     }
                     match sup.args[1] {
                         ast::Val::List(ref params_) => {
-                            params = try_opt!(params_.iter()
+                            params = try!(params_.iter()
                                 .map(|v| match *v {
                                     ast::Val::Type(ref t) => LLVMType::from_ast(t),
                                     _ => None
                                 })
-                                .collect::<Option<_>>())
+                                .collect::<Option<_>>().ok_or("missing params"))
                         }
-                        _ => return None
+                        _ => return Err("missing Intrinsic[1]")
                     }
                     match sup.args[3] {
                         ast::Val::String(ref s) => {
                             if !s.is_empty() { llvm_name = Some(s.clone()) }
                         }
-                        _ => return None
+                        _ => return Err("missing Intrinsic[3]")
                     }
                 }
                 _ => {}
             }
         }
 
-        Some(Intrinsic {
+        Ok(Intrinsic {
             arch: arch.ok(),
             name: d.name.clone(),
             gcc_name: gcc_name,
@@ -437,11 +438,11 @@ impl Intrinsic {
                 })
                 .collect::<Option<Vec<_>>>();
             let params = match params {
-                Some(p) => p.connect(", "),
+                Some(p) => p.join(", "),
                 None => return
             };
 
-            let ret = match &*used_ret {
+            let ret = match *used_ret {
                 [] => "()".to_string(),
                 [ref ret] => match ret.to_concrete_rust_string() {
                     Some(r) => r,
