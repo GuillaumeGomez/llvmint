@@ -17,12 +17,12 @@ once I'm more happy with the experimentation.
 
 ## Regenerating
 
-To (re)create the table of intrinsics `allintrinsics.td`:
+To (re)create the table of intrinsics `allintrinsics`:
 
 ```sh
 # directory containing a rust-lang/rust checkout
 RUST=~/rust
-cat ${RUST}/src/llvm/include/llvm/IR/Intrinsics*.td > allintrinsics.td
+cat ${RUST}/src/llvm/include/llvm/IR/Intrinsics*.td > allintrinsics
 ```
 
 To recreate the library file:
@@ -30,7 +30,7 @@ To recreate the library file:
 ```sh
 cd generator
 cargo build --release
-./target/release/generator < ../allintrinsics.td > ../src/lib.rs
+./target/release/generator < ../allintrinsics > ../src/lib.rs
 ```
 
 Why not a build script? Partly because I haven't written one, partly
