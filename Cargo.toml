@@ -16,7 +16,7 @@ Bindings to (almost) all LLVM intrinsics, for all platforms.
 
 
 [dependencies]
-simdty = "0"
+simdty = { git = "https://github.com/GuillaumeGomez/simdty", rev = "ecfa075d744240e933b6d054ae1b4609aa32b9b9", version = "0.0.7" }
 
 [features]
 unstable = []
